@@ -10,20 +10,22 @@ Emacs package for AI assistance using [yagi](https://github.com/mattn/yagi).
 
 ## Installation
 
-### Using use-package (with straight.el)
+### Using use-package (with vc)
+
+Emacs 29+ built-in:
 
 ```elisp
 (use-package yagi
-  :straight (:host github :repo "knwoop/emacs-yagi")
+  :vc (:url "https://github.com/knwoop/emacs-yagi" :branch "main")
   :config
   (yagi-mode 1))
 ```
 
-### Using leaf.el (with straight.el)
+### Using leaf.el (with vc)
 
 ```elisp
 (leaf yagi
-  :straight (yagi :type git :host github :repo "knwoop/emacs-yagi")
+  :vc (:url "https://github.com/knwoop/emacs-yagi" :branch "main")
   :global-minor-mode yagi-mode)
 ```
 
