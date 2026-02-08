@@ -1,6 +1,6 @@
 # emacs-yagi
 
-Emacs package for AI assistance using [yagi](https://github.com/mattn/yagi).
+Emacs package for AI assistance using [yagi](https://github.com/yagi-agent/yagi).
 
 ## Requirements
 
@@ -130,7 +130,7 @@ Make sure yagi is installed and in your PATH:
 
 ```bash
 # Install yagi
-go install github.com/mattn/yagi@latest
+go install github.com/yagi-agent/yagi@latest
 
 # Verify
 which yagi
@@ -152,7 +152,7 @@ If running Emacs from a GUI launcher, environment variables from your shell may 
 
 ## Related Projects
 
-- [yagi](https://github.com/mattn/yagi) - The CLI tool this package uses
+- [yagi](https://github.com/yagi-agent/yagi) - The CLI tool this package uses
 - [vim-yagi](https://github.com/yagi-agent/vim-yagi) - Vim plugin for yagi
 
 ## License
