@@ -105,6 +105,10 @@ When non-nil, responses are displayed incrementally as tokens arrive."
   "Cons cell (BEG-MARKER . END-MARKER) of the region in the source buffer.
 Uses markers to track position even when the buffer is edited.")
 
+(defvar yagi--chat-history nil
+  "List of chat messages for multi-turn conversation.
+Each element is an alist with `role' and `content' keys.")
+
 ;;; Utilities
 
 (defun yagi--mode-to-language ()
@@ -201,10 +205,12 @@ Clears the buffer and ensures it is visible."
           (push (format "%s=%s" key val) env))))
     env))
 
-(defun yagi--send-request (messages callback)
+(defun yagi--send-request (messages callback &optional prepare-buffer-fn)
   "Send MESSAGES to yagi and call CALLBACK with the result.
 MESSAGES is a list of message alists with `role' and `content' keys.
 CALLBACK receives a plist with either :content or :error key.
+PREPARE-BUFFER-FN, if non-nil, replaces the default buffer preparation
+for streaming mode.
 Per-request state is stored on the process object via `process-put',
 so concurrent requests do not interfere with each other."
   (if (not (executable-find yagi-executable))
@@ -238,7 +244,9 @@ so concurrent requests do not interfere with each other."
                                          (concat (process-get proc 'yagi-error)
                                                  output))))
       (when yagi-stream
-        (yagi--prepare-response-buffer))
+        (if prepare-buffer-fn
+            (funcall prepare-buffer-fn)
+          (yagi--prepare-response-buffer)))
       (setq yagi--process proc)
       (process-send-string proc (concat request "\n"))
       (process-send-eof proc)
@@ -360,13 +368,57 @@ SOURCE-BUFFER and SOURCE-REGION identify the code to replace."
               (message "Yagi: Code fixed!"))
           (yagi--show-in-buffer content)))))))
 
+(defun yagi--format-chat-history ()
+  "Format `yagi--chat-history' as a readable string for the response buffer."
+  (mapconcat
+   (lambda (msg)
+     (let ((role (alist-get 'role msg))
+           (content (alist-get 'content msg)))
+       (format "### %s\n\n%s\n"
+               (if (string= role "user") "User" "Assistant")
+               content)))
+   (reverse yagi--chat-history)
+   "\n"))
+
+(defun yagi--prepare-chat-response-buffer ()
+  "Prepare the response buffer with chat history for streaming.
+Erases the buffer, inserts formatted history, and positions cursor at the end."
+  (let ((buf (get-buffer-create yagi-response-buffer-name)))
+    (with-current-buffer buf
+      (let ((inhibit-read-only t))
+        (erase-buffer)
+        (when yagi--chat-history
+          (insert (yagi--format-chat-history))
+          (insert "\n### Assistant\n\n")))
+      (unless (derived-mode-p 'yagi-response-mode)
+        (yagi-response-mode)))
+    (display-buffer buf '(display-buffer-in-side-window
+                          . ((side . right)
+                             (window-width . 0.4))))))
+
+(defun yagi--handle-chat-response (result)
+  "Handle chat RESULT.  Add assistant response to history and display."
+  (let ((err (plist-get result :error))
+        (content (plist-get result :content))
+        (streamed (plist-get result :stream)))
+    (cond
+     (err (message "Yagi error: %s" err))
+     (content
+      (push `((role . "assistant") (content . ,content)) yagi--chat-history)
+      (if streamed
+          (message "Yagi: Done.")
+        (yagi--show-in-buffer
+         (yagi--format-chat-history)))))))
+
 ;;; Interactive commands
 
 ;;;###autoload
 (defun yagi-chat (prompt beg end)
   "Chat with AI.
 PROMPT is the user's question.  If region is active, use selected
-code between BEG and END as context."
+code between BEG and END as context.
+Conversation history is preserved across calls.  Use
+`yagi-chat-reset' to start a new conversation."
   (interactive
    (list (read-string "Yagi> ")
          (if (use-region-p) (region-beginning))
@@ -383,8 +435,11 @@ code between BEG and END as context."
                       (unless (string-empty-p lang) (concat " (" lang ")"))
                       "\n\n```" lang "\n" selection "\n```\n\n" prompt)
             prompt))
-         (messages (vector `((role . "user") (content . ,user-content)))))
-    (yagi--send-request messages #'yagi--handle-response)))
+         (user-msg `((role . "user") (content . ,user-content))))
+    (push user-msg yagi--chat-history)
+    (let ((messages (vconcat (reverse yagi--chat-history))))
+      (yagi--send-request messages #'yagi--handle-chat-response
+                          #'yagi--prepare-chat-response-buffer))))
 
 ;;;###autoload
 (defun yagi-prompt (prompt)
@@ -500,6 +555,14 @@ PROMPT is the question to ask."
           yagi--source-region nil)
     (message "Yagi: Code applied!")))
 
+;;;###autoload
+(defun yagi-chat-reset ()
+  "Clear the chat conversation history.
+The next `yagi-chat' call will start a fresh conversation."
+  (interactive)
+  (setq yagi--chat-history nil)
+  (message "Yagi: Chat history cleared."))
+
 ;;; Keymap and minor mode
 
 (defvar yagi-command-map
@@ -510,6 +573,7 @@ PROMPT is the question to ask."
     (define-key map (kbd "r") #'yagi-refactor)
     (define-key map (kbd "m") #'yagi-comment)
     (define-key map (kbd "f") #'yagi-fix)
+    (define-key map (kbd "x") #'yagi-chat-reset)
     map)
   "Keymap for yagi commands, used under the prefix key.")
 
