@@ -81,6 +81,7 @@ export GEMINI_API_KEY="your-key-here"
 | `M-x yagi-refactor` | Refactor selected code | Yes |
 | `M-x yagi-comment` | Add comments to selected code | Yes |
 | `M-x yagi-fix` | Fix bugs in selected code | Yes |
+| `M-x yagi-chat-reset` | Clear chat conversation history | No |
 | `M-x yagi-apply` | Apply pending refactored code | No |
 
 ## Default Key Bindings
@@ -95,6 +96,7 @@ When `yagi-mode` is enabled, the following keybindings are available under the `
 | `C-c Y r` | `yagi-refactor` |
 | `C-c Y m` | `yagi-comment` |
 | `C-c Y f` | `yagi-fix` |
+| `C-c Y x` | `yagi-chat-reset` |
 
 ## Usage Examples
 
